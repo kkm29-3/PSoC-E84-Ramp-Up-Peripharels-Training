@@ -1,0 +1,68 @@
+/*******************************************************************************
+* Header Files
+*******************************************************************************/
+#include "cybsp.h"
+#include "cy_time.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "cyabs_rtos.h"
+#include "cyabs_rtos_impl.h"
+
+/*******************************************************************************
+ * Macros
+ ******************************************************************************/
+#include "cy_pdl.h"
+#include "cybsp.h"
+#include "cy_syslib.h"
+
+
+    /* Scenario: Vector table is relocated to RAM in __ramVectors[] */
+
+    /* Prototype of ISR function for port interrupt 0. For CY_IP_M7CPUSS port 21 is configured */
+//    void Interrupt_Handler_Port0 (void);
+
+    /* Initialize the interrupt with vector at Interrupt_Handler_Port0() */
+//    Cy_SysInt_Init(&intrCfg, &Interrupt_Handler_Port0);
+
+//    /* Enable the interrupt */
+//#if (CY_IP_M7CPUSS)
+//    NVIC_EnableIRQ((IRQn_Type) NvicMux3_IRQn);
+//#else
+//    NVIC_EnableIRQ(intrCfg.intrSrc);
+//#endif
+
+int main(void)
+{
+
+    cybsp_init();
+    __enable_irq();
+
+
+    bool led_state = false;
+    bool prev_state = 1;
+//    0 = Pin interrupt condition not detected 1 = Pin interrupt condition detected
+
+    if(0UL == Cy_GPIO_GetInterruptStatus(GPIO_PRT8, 3))
+    {
+    	Cy_GPIO_Write(GPIO_PRT16, 6, 1);
+
+            bool curr_state = Cy_GPIO_Read(GPIO_PRT8, 3);
+
+        /* Detect falling edge (button press) */
+        if(prev_state == 1 && curr_state == 0)
+        {
+            Cy_SysLib_Delay(20);  // debounce
+
+            if(Cy_GPIO_Read(GPIO_PRT8, 3) == 0)
+            {
+                led_state = !led_state;
+                Cy_GPIO_Write(GPIO_PRT16, 7, led_state);
+            }
+       }
+
+        prev_state = curr_state;
+    }
+    /* Clear the GPIO_PRT8 interrupt */
+           Cy_GPIO_ClearInterrupt(GPIO_PRT8, 3);
+}

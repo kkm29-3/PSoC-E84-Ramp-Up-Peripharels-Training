@@ -1,0 +1,122 @@
+#include "cy_device_headers_ns.h"
+
+#include "cy_time.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "cyabs_rtos.h"
+#include "cyabs_rtos_impl.h"
+#include "cy_pdl.h"
+#include "cycfg.h"
+//#include "cyhal.h"
+#include "cybsp.h"
+#include "cycfg_peripherals.h"
+#include "string.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/_intsup.h>
+#include <sys/types.h>
+
+/*******************************************************************************
+ * Macros
+ ******************************************************************************/
+
+/* The timeout value in microsecond used to wait for the CM55 core to be booted.
+ * Use value 0U for infinite wait till the core is booted successfully.
+ */
+#define CM55_BOOT_WAIT_TIME_USEC            (10U)
+
+/* App boot address for CM55 project */
+#define CM55_APP_BOOT_ADDR                  (CYMEM_CM33_0_m55_nvm_START + \
+                                                CYBSP_MCUBOOT_HEADER_SIZE)
+#define BUFFER_SIZE 64
+
+/*******************************************************************************
+ * Global Variables
+ ******************************************************************************/
+cy_stc_scb_uart_context_t CYBSP_DEBUG_UART_context;
+char rx_buffer[BUFFER_SIZE];
+size_t rx_index = 0;
+bool led_state = false;
+
+static void handle_app_error(void) {
+	/*Disable all interrupts. */
+	__disable_irq();
+
+	CY_ASSERT(0);
+
+	/* Infinite loop*/
+	while (true)
+		;
+}
+
+int main(void) {
+	cy_rslt_t result;
+
+	/*  Initialize the device and board peripherals*/
+	result = cybsp_init();
+
+	/* Board initialization failed. Stop program execution */
+	if (CY_RSLT_SUCCESS != result) {
+		handle_app_error();
+	}
+
+	/*Enable CM55.
+	CM55_APP_BOOT_ADDR must be updated if CM55 memory layout is changed.*/
+	// Cy_SysEnableCM55(MXCM55, CM55_APP_BOOT_ADDR, CM55_BOOT_WAIT_TIME_USEC);
+
+	/*Enable global interrupts */
+	__enable_irq();
+
+	Cy_SCB_UART_Init(CYBSP_DEBUG_UART_HW, &CYBSP_DEBUG_UART_config,
+					 &CYBSP_DEBUG_UART_context);
+	Cy_SCB_UART_Enable(CYBSP_DEBUG_UART_HW);
+	Cy_SCB_UART_PutString(CYBSP_DEBUG_UART_HW,
+						  "\r\n UART Command Application\r\n");
+	Cy_SCB_UART_PutString(CYBSP_DEBUG_UART_HW,
+						  "Type:help led Red,led off,led Green,led Blue\r\n");
+
+	for (;;) {
+		// Cy_GPIO_Clr(GPIO_PRT16, 6);
+
+		char ch = Cy_SCB_UART_Get(CYBSP_DEBUG_UART_HW);
+
+		if (ch != 0xFF) {
+			if (ch == '\r' || ch == '\n') {
+				rx_buffer[rx_index] = '\0';
+
+				Cy_SCB_UART_PutString(CYBSP_DEBUG_UART_HW, "\r\n");
+
+				if (strcmp(rx_buffer, "help") == 0) {
+					Cy_SCB_UART_PutString(CYBSP_DEBUG_UART_HW,
+										  "Commands:\r\nhelp\r\nled on\r\nled "
+										  "off\r\nled Green\r\n\r\n");
+				} else if (strcmp(rx_buffer, "led Red") == 0) {
+					Cy_GPIO_Inv(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN);
+				}
+
+				else if (strcmp(rx_buffer, "led Green") == 0) {
+					Cy_GPIO_Inv(CYBSP_USER_LED2_PORT, CYBSP_USER_LED2_PIN);
+				} else if (strcmp(rx_buffer, "led Blue") == 0) {
+					Cy_GPIO_Inv(CYBSP_USER_LED3_PORT, CYBSP_USER_LED3_PIN);
+				} else if (strcmp(rx_buffer, "led off") == 0) {
+					Cy_GPIO_Clr(GPIO_PRT16, 7);
+					Cy_SysLib_Delay(100);
+					Cy_GPIO_Clr(GPIO_PRT16, 6);
+					Cy_SysLib_Delay(100);
+					Cy_GPIO_Clr(GPIO_PRT16, 5);
+					Cy_SysLib_Delay(100);
+				} else {
+					Cy_SCB_UART_PutString(CYBSP_DEBUG_UART_HW,
+										  "Invalid Command\r\n");
+				}
+				rx_index = 0;
+			} else {
+				if (rx_index < BUFFER_SIZE - 1) {
+					rx_buffer[rx_index++] = ch;
+					Cy_SCB_UART_Put(CYBSP_DEBUG_UART_HW, ch);
+				}
+			}
+		}
+	}
+}

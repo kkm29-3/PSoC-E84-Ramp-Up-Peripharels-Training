@@ -1,0 +1,59 @@
+/*******************************************************************************
+* Header Files
+*******************************************************************************/
+#include "cybsp.h"
+#include "cy_time.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "cyabs_rtos.h"
+#include "cyabs_rtos_impl.h"
+
+/*******************************************************************************
+ * Macros
+ ******************************************************************************/
+#include "cy_pdl.h"
+#include "cybsp.h"
+#include "cy_syslib.h"
+
+int main(void) {
+	cybsp_init();
+	__enable_irq();
+
+	bool led_state = false;
+	bool prev_state1 = 1;
+	bool prev_state2 = 1;
+
+	while (1)
+	{
+
+		bool curr_state1 = Cy_GPIO_Read(GPIO_PRT8, 3);
+		bool curr_state2 = Cy_GPIO_Read(GPIO_PRT8, 7);
+
+		/* Detect falling edge (button press) */
+		if (prev_state1 == 1 && curr_state1 == 0) {
+
+			Cy_SysLib_Delay(20); // debounce
+
+			if (Cy_GPIO_Read(GPIO_PRT8, 3) == 0) {
+				led_state = !led_state;
+				Cy_GPIO_Write(GPIO_PRT16, 7, led_state);
+//				Cy_GPIO_Clr(GPIO_PRT16, 7);
+			}
+		}
+		/* Detect falling edge (button press) */
+		if (prev_state2 == 1 && curr_state2 == 0) {
+			Cy_SysLib_Delay(20); // debounce
+
+			if (Cy_GPIO_Read(GPIO_PRT8, 7) == 0) {
+				led_state = !led_state;
+//				Cy_GPIO_Write(GPIO_PRT16, 7, led_state);
+				Cy_GPIO_Clr(GPIO_PRT16, 7);
+			}
+//			 Cy_GPIO_Clr(GPIO_PRT16, 7);
+		}
+
+		prev_state1 = curr_state1;
+		prev_state2 = curr_state2;
+	}
+}

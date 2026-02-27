@@ -1,0 +1,77 @@
+#include "cy_pdl.h"
+#include "cybsp.h"
+#include "retarget_io_init.h"
+#include "stdio.h"
+
+cy_stc_scb_uart_context_t CYBSP_UART_context;
+
+int main(void)
+{
+    cy_rslt_t result = cybsp_init();
+    if (result != CY_RSLT_SUCCESS)
+    {
+        // Handle board init error
+        for(;;);
+    }
+
+    __enable_irq();
+
+    // Initialize retarget-io for printf/scanf over UART
+    init_retarget_io();
+
+    int input;
+
+    while (1)
+    {
+        printf("\nPress 1 for RED LED blink\n");
+        printf("Press 2 for GREEN LED blink\n");
+        printf("Press 3 for BLUE LED blink\n");
+        printf("Press 4 to print HELLO WORLD\n");
+        printf("Press 5 for ADD\n");
+
+        if (scanf("%d", &input) != 1)
+        {
+            // Clear invalid input
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
+            printf("Invalid input, try again.\n");
+            continue;
+        }
+
+        switch (input)
+        {
+            case 1:
+                printf("RED LED BLINK\n");
+                Cy_GPIO_Clr(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN);
+                Cy_SysLib_Delay(500);
+                Cy_GPIO_Set(CYBSP_USER_LED1_PORT, CYBSP_USER_LED1_PIN);
+                break;
+
+            case 2:
+                printf("GREEN LED BLINK\n");
+                Cy_GPIO_Clr(CYBSP_USER_LED2_PORT, CYBSP_USER_LED2_PIN);
+                Cy_SysLib_Delay(500);
+                Cy_GPIO_Set(CYBSP_USER_LED2_PORT, CYBSP_USER_LED2_PIN);
+                break;
+
+            case 3:
+                printf("BLUE LED BLINK\n");
+                Cy_GPIO_Clr(CYBSP_USER_LED3_PORT, CYBSP_USER_LED3_PIN);
+                Cy_SysLib_Delay(500);
+                Cy_GPIO_Set(CYBSP_USER_LED3_PORT, CYBSP_USER_LED3_PIN);
+                break;
+
+            case 4:
+                printf("HELLO WORLD\n");
+                break;
+
+            case 5:
+                printf("2 + 3 = %d\n", 2 + 3);
+                break;
+
+            default:
+                printf("Incorrect input\n");
+                break;
+        }
+    }
+}

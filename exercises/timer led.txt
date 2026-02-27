@@ -1,0 +1,93 @@
+
+#include "cy_pdl.h"
+#include "cybsp.h"
+#define timer2
+
+#ifdef timer2
+
+#include "cybsp.h"
+
+#define TIMER_INT_PRIORITY                (3U)
+#define BIT_MASK_CHECK                    (0U)
+
+/* The timeout value in microsecond used to wait for core to be booted */
+#define CM55_BOOT_WAIT_TIME_USEC          (10U)
+
+/* App boot address for CM55 project */
+#define CM55_APP_BOOT_ADDR          (CYMEM_CM33_0_m55_nvm_START + \
+                                        CYBSP_MCUBOOT_HEADER_SIZE)
+
+cy_stc_sysint_t timer_irq_cfg =
+{
+    .intrSrc = CYBSP_GENERAL_PURPOSE_TIMER_IRQ,
+    .intrPriority = TIMER_INT_PRIORITY
+};
+
+static void timer_isr(void)
+{
+    uint32_t interrupts = Cy_TCPWM_GetInterruptStatusMasked(CYBSP_GENERAL_PURPOSE_TIMER_HW, CYBSP_GENERAL_PURPOSE_TIMER_NUM);
+
+    Cy_TCPWM_ClearInterrupt(CYBSP_GENERAL_PURPOSE_TIMER_HW, CYBSP_GENERAL_PURPOSE_TIMER_NUM, interrupts);
+
+    /* Check for Terminal Count event */
+    if (BIT_MASK_CHECK != (CY_TCPWM_INT_ON_TC & interrupts))
+    {
+        /* Toggle LED state */
+        Cy_GPIO_Inv(CYBSP_USER_LED_PORT, CYBSP_USER_LED_PIN);
+    }
+}
+
+/*
+*
+*  It sets up the TCPWM counter to operate in a mode that triggers
+*  an interrupt once every second. Upon each interrupt, the USER LED
+*  is toggled. */
+
+int main(void)
+{
+    cy_rslt_t result;
+
+    /* Initialize the device and board peripherals. */
+    result = cybsp_init();
+
+    /* Board initialization failed. Stop program execution. */
+    if (CY_RSLT_SUCCESS != result)
+    {
+        CY_ASSERT(0);
+    }
+
+    /* Enable global interrupts */
+    __enable_irq();
+
+    /* Enable CM55. */
+    /* CM55_APP_BOOT_ADDR must be updated if CM55 memory layout is changed.*/
+    Cy_SysEnableCM55(MXCM55, CM55_APP_BOOT_ADDR, CM55_BOOT_WAIT_TIME_USEC);
+
+    /* Initialze TCPWM block with required timer configuration */
+    if (CY_TCPWM_SUCCESS != Cy_TCPWM_Counter_Init(CYBSP_GENERAL_PURPOSE_TIMER_HW, CYBSP_GENERAL_PURPOSE_TIMER_NUM, &CYBSP_GENERAL_PURPOSE_TIMER_config))
+    {
+        CY_ASSERT(0);
+    }
+
+    /* Set the interrupt line for COUNTER_HW */
+    if (CY_SYSINT_SUCCESS != Cy_SysInt_Init(&timer_irq_cfg, &timer_isr))
+    {
+        CY_ASSERT(0);
+    }
+
+    /* Enable system Interrupt */
+    NVIC_EnableIRQ(CYBSP_GENERAL_PURPOSE_TIMER_IRQ);
+
+    /* Enable the initialized counter */
+    Cy_TCPWM_Counter_Enable(CYBSP_GENERAL_PURPOSE_TIMER_HW, CYBSP_GENERAL_PURPOSE_TIMER_NUM);
+
+    /* Start the counter */
+    Cy_TCPWM_TriggerStart_Single(CYBSP_GENERAL_PURPOSE_TIMER_HW, CYBSP_GENERAL_PURPOSE_TIMER_NUM);
+
+    for (;;)
+    {
+        /* Put CPU to Sleep mode */
+        Cy_SysPm_CpuEnterSleep(CY_SYSPM_WAIT_FOR_INTERRUPT);
+    }
+}
+#endif
